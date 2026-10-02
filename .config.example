@@ -1,0 +1,12 @@
+{
+  "dashboard": { "url": "https://kidsdashboard-eight.vercel.app" },
+  "classroom": {
+    "E": { "username": "", "password": "" },
+    "A": { "username": "", "password": "" }
+  },
+  "genesis": {
+    "username": "",
+    "password": "",
+    "studentIds": { "E": "", "A": "" }
+  }
+}

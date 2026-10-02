@@ -1,0 +1,238 @@
+generator client {
+  provider = "prisma-client"
+  output = "../generated/prisma"
+}
+datasource db {
+  provider = "postgresql"
+}
+enum ChildCode {
+  E
+  A
+}
+enum Source {
+  GENESIS
+  GOOGLE_CLASSROOM
+  GOOGLE_CLASSROOM_BROWSER @map("google_classroom_browser")
+}
+enum AssignmentStatus {
+  UPCOMING
+  DUE_SOON
+  SUBMITTED
+  GRADED
+  MISSING
+  LATE
+  UNKNOWN
+}
+enum AssignmentType {
+  ASSIGNMENT
+  TEST
+  PROJECT
+}
+enum SyncStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+}
+model Child {
+  id ChildCode @id
+  courses Course[]
+  assignments Assignment[]
+  lunchSnapshots LunchBalanceSnapshot[]
+  connections OAuthConnection[]
+}
+model Course {
+  id String @id @default(cuid())
+  childId ChildCode
+  child Child @relation(fields: [childId], references: [id])
+  name String
+  teacherName String?
+  sourceUrl String?
+  lastExtractedAt DateTime?
+  // Source-specific courses remain separate until explicitly reconciled.
+  source Source
+  externalId String
+  schoolYear String
+  active Boolean @default(true)
+  assignments Assignment[]
+  grades CourseGrade[]
+  createdAt DateTime @default(now())
+  @@unique([childId, source, externalId, schoolYear])
+  @@unique([id, childId])
+  @@index([childId, schoolYear])
+}
+model Assignment {
+  id String @id @default(cuid())
+  childId ChildCode
+  child Child @relation(fields: [childId], references: [id])
+  courseId String
+  course Course @relation(fields: [courseId, childId], references: [id, childId])
+  title String
+  description String?
+  assignedDate DateTime?
+  dueDate DateTime?
+  dueDateOnly Boolean @default(false)
+  type AssignmentType @default(ASSIGNMENT)
+  status AssignmentStatus @default(UNKNOWN)
+  pointsEarned Decimal? @db.Decimal(10, 3)
+  pointsPossible Decimal? @db.Decimal(10, 3)
+  grade Decimal? @db.Decimal(7, 3)
+  currentGrade String?
+  firstSeenAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sources AssignmentSource[]
+  history AssignmentHistory[]
+  @@index([childId, dueDate])
+  @@index([status, dueDate])
+  @@index([courseId])
+  @@unique([id, childId])
+}
+model AssignmentSource {
+  id String @id @default(cuid())
+  assignmentId String
+  assignment Assignment @relation(fields: [assignmentId, childId], references: [id, childId])
+  childId ChildCode
+  source Source
+  externalId String
+  sourceUrl String?
+  // Retain source payloads server-side; never serialize raw data into the UI.
+  raw Json
+  fingerprint String
+  lastSeenAt DateTime @default(now())
+  lastExtractedAt DateTime?
+  available Boolean @default(true)
+  revisions SourceRevision[]
+  @@unique([childId, source, externalId])
+  @@index([assignmentId])
+}
+model SourceRevision {
+  id String @id @default(cuid())
+  assignmentSourceId String
+  assignmentSource AssignmentSource @relation(fields: [assignmentSourceId], references: [id])
+  raw Json
+  fingerprint String
+  observedAt DateTime @default(now())
+  @@index([assignmentSourceId, observedAt])
+}
+model AssignmentHistory {
+  id String @id @default(cuid())
+  assignmentId String
+  assignment Assignment @relation(fields: [assignmentId], references: [id])
+  syncRunId String
+  syncRun SyncRun @relation(fields: [syncRunId], references: [id])
+  title String
+  description String?
+  status AssignmentStatus
+  dueDate DateTime?
+  dueDateOnly Boolean @default(false)
+  assignedDate DateTime?
+  type AssignmentType
+  pointsEarned Decimal? @db.Decimal(10, 3)
+  pointsPossible Decimal? @db.Decimal(10, 3)
+  grade Decimal? @db.Decimal(7, 3)
+  fingerprint String
+  observedAt DateTime @default(now())
+  // Uniqueness is per run, not per fingerprint: A -> B -> A must retain all three.
+  sourceState String?
+  sourceLate Boolean @default(false)
+  currentGrade String?
+  @@unique([assignmentId, syncRunId])
+  @@index([assignmentId, observedAt])
+  @@index([syncRunId])
+}
+model CourseGrade {
+  id String @id @default(cuid())
+  courseId String
+  course Course @relation(fields: [courseId], references: [id])
+  period String
+  grade String?
+  percentage Decimal? @db.Decimal(7, 3)
+  updatedAt DateTime @updatedAt
+  snapshots CourseGradeSnapshot[]
+  @@unique([courseId, period])
+}
+model CourseGradeSnapshot {
+  id String @id @default(cuid())
+  courseGradeId String
+  courseGrade CourseGrade @relation(fields: [courseGradeId], references: [id])
+  grade String?
+  percentage Decimal? @db.Decimal(7, 3)
+  syncRunId String
+  syncRun SyncRun @relation(fields: [syncRunId], references: [id])
+  observedAt DateTime @default(now())
+  @@unique([courseGradeId, syncRunId])
+  @@index([courseGradeId, observedAt])
+}
+model LunchBalanceSnapshot {
+  id String @id @default(cuid())
+  childId ChildCode
+  child Child @relation(fields: [childId], references: [id])
+  balance Decimal @db.Decimal(10, 2)
+  syncRunId String
+  syncRun SyncRun @relation(fields: [syncRunId], references: [id])
+  observedAt DateTime @default(now())
+  @@unique([childId, syncRunId])
+  @@index([childId, observedAt])
+}
+model OAuthConnection {
+  id String @id @default(cuid())
+  childId ChildCode
+  child Child @relation(fields: [childId], references: [id])
+  provider String
+  accountId String
+  accountEmail String?
+  encryptedRefreshToken String
+  scopes String[]
+  updatedAt DateTime @updatedAt
+  @@unique([childId, provider])
+  @@unique([provider, accountId])
+}
+model DataSource {
+  id String @id
+  source Source
+  childId ChildCode?
+  lastAttemptAt DateTime?
+  lastSuccessAt DateTime?
+  leaseToken String?
+  leaseExpiresAt DateTime?
+  syncRuns SyncRun[]
+}
+model SyncRun {
+  id String @id @default(cuid())
+  dataSourceId String
+  dataSource DataSource @relation(fields: [dataSourceId], references: [id])
+  status SyncStatus @default(RUNNING)
+  startedAt DateTime @default(now())
+  finishedAt DateTime?
+  recordsRetrieved Int @default(0)
+  recordsCreated Int @default(0)
+  recordsUpdated Int @default(0)
+  snapshotChanges Int @default(0)
+  // Store only allowlisted error codes; no upstream bodies, tokens, or cookies.
+  errorCode String?
+  assignments AssignmentHistory[]
+  grades CourseGradeSnapshot[]
+  lunches LunchBalanceSnapshot[]
+  @@index([dataSourceId, startedAt])
+  @@index([status, startedAt])
+}
+model ReconciliationDecision {
+  id String @id @default(cuid())
+  leftSourceId String
+  rightSourceId String
+  decision String
+  // Audit manual links/splits; never auto-merge based on titles alone.
+  reason String
+  createdAt DateTime @default(now())
+  @@index([leftSourceId, rightSourceId])
+}
+model OAuthAttempt {
+  stateHash String @id
+  childId ChildCode
+  parentHash String
+  browserHash String
+  encryptedVerifier String
+  nonce String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([expiresAt])
+}

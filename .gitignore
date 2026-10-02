@@ -1,0 +1,26 @@
+node_modules/
+.next/
+.env*
+!.env.example
+.npm-cache/
+generated/
+*.tsbuildinfo
+test-results/
+playwright-report/
+.vercel/
+artifacts/
+classroom-extension/dist/
+.config
+.config.*
+!.config.example
+.collector/
+.collector.lock
+
+.vercel/
+# Local planning and agent files may contain account details.
+int_prompt.md
+CLAUDE.md
+.agents/
+.codex/
+.claude/
+skills-lock.json

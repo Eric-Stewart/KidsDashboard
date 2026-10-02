@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "KidsDashboard Classroom Sync",
+  "version": "1.0.0",
+  "description": "Manually import visible Classroom work into your private KidsDashboard.",
+  "minimum_chrome_version": "114",
+  "permissions": ["storage", "activeTab"],
+  "optional_host_permissions": [
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://*/*"
+  ],
+  "host_permissions": ["https://classroom.google.com/*"],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "KidsDashboard Classroom Sync"
+  },
+  "options_page": "popup.html",
+  "content_scripts": [
+    {
+      "matches": ["https://classroom.google.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}
