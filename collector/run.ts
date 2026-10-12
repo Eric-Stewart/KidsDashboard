@@ -32,7 +32,9 @@ if(!process.env.KIDS_DASHBOARD_INGEST_KEY||process.env.KIDS_DASHBOARD_INGEST_KEY
   try{
     const output=await build({entryPoints:["collector/page-entry.ts"],bundle:true,write:false,platform:"browser",target:"chrome114",format:"iife",logLevel:"silent"});
     const bundle=output.outputFiles[0].text;
-    const browser=await chromium.launch({channel:"chrome",headless:false});
+    let browser;
+    try{browser=await chromium.launch({channel:"chrome",headless:false});}
+    catch{throw new CollectorError(`Chrome could not open a visible window (DISPLAY=${process.env.DISPLAY??"(unset)"}). Keep this computer logged in with Google Chrome installed, then run manual refresh.`);}
     try{
       for(const job of jobs){
         // Separate ephemeral contexts ensure neither child's account leaks into the other's run.
