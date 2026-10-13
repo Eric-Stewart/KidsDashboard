@@ -13,8 +13,17 @@ async function navigate(page:Page,url:string,id:string){
 export function parseGenesisLunchBalance(balances:string[]):number|undefined{
  if(balances.length!==1)return undefined;
  const raw=balances[0];
- if(!/^\(?-?\$?[\d,]+\.\d{2}\)?$/.test(raw))return undefined;
+ const amount=String.raw`(?:\d+|\d{1,3}(?:,\d{3})+)\.\d{2}`;
+ if(!new RegExp(`^(?:-?\\$?${amount}|\\(\\$?${amount}\\))$`).test(raw))return undefined;
  return Number(raw.replace(/[$,()]/g,""))*(raw.includes("(")?-1:1);
+}
+export function genesisImportSummary(children:Array<{child:"E"|"A";lunchBalance?:number}>){
+ const refreshed=children.filter(child=>child.lunchBalance!==undefined).map(child=>child.child);
+ const skipped=children.filter(child=>child.lunchBalance===undefined).map(child=>child.child);
+ const parts=[];
+ if(skipped.length)parts.push(`lunch balance skipped for ${skipped.join(" and ")}`);
+ if(refreshed.length)parts.push(`refreshed for ${refreshed.join(" and ")}`);
+ return `Genesis: grades and assignments imported for both children; ${parts.join(" and ")}.`;
 }
 export async function collectGenesis(page:Page,config:CollectorConfig,sink?: (body: unknown)=>Promise<unknown>){
  await signIn(page,"genesis",config.genesis,Object.values(config.genesis.studentIds));
@@ -77,5 +86,5 @@ export async function collectGenesis(page:Page,config:CollectorConfig,sink?: (bo
  if(sink){await sink(payload);return;}
  let response:Response;try{response=await fetch(`${config.dashboard.url}/api/genesis/import`,{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${process.env.KIDS_DASHBOARD_INGEST_KEY}`},credentials:"omit",redirect:"error",signal:AbortSignal.timeout(100000),body:JSON.stringify(payload)});}catch{throw new CollectorError("KidsDashboard is unavailable; Genesis data was not saved.");}
  if(!response.ok)throw new CollectorError(response.status===401?"Invalid KidsDashboard ingestion key.":`KidsDashboard rejected the Genesis import (HTTP ${response.status}); previous data preserved.`);
- console.log("Genesis: both children's grades, assignments and lunch balances imported successfully.");
+ console.log(genesisImportSummary(payload.children));
 }

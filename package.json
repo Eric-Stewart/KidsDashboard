@@ -11,7 +11,7 @@
     "build": "prisma generate && node scripts/build-cloud-collector.mjs && next build",
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --conditions=react-server --test tests/*.test.ts",
+    "test": "node --test macos/linux-schedule.test.mjs && tsx --conditions=react-server --test tests/*.test.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "prisma db seed",

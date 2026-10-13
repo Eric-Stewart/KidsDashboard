@@ -1,6 +1,8 @@
 "use client";
 import { childName } from "@/lib/children";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { scheduleDashboardRefresh } from "@/lib/dashboard-refresh";
 import Link from "next/link";
 import {
   AlertCircle,
@@ -34,6 +36,8 @@ import {
   RefreshButton,
 } from "./shared";
 export function Dashboard({ data }: { data: DashboardData }) {
+  const router = useRouter();
+  useEffect(() => scheduleDashboardRefresh(() => router.refresh()), [router]);
   const [filters, setFilters] = useState(initialFilters);
   const [selected, setSelected] = useState<Assignment | null>(null);
   const attention = data.assignments

@@ -4,6 +4,17 @@ import { genesisImportSchema } from "./genesis-browser-schema";
 import { assignmentFingerprint } from "./history";
 import { browserDate } from "./classroom-browser-schema";
 const sourceUrl="https://parents.c3.genesisedu.net/leonia/parents";
+export async function reconcileGenesisSnapshot(
+ tx:Pick<Prisma.TransactionClient,"assignmentSource"|"course">,
+ child:"E"|"A",
+ schoolYear:string,
+ assignmentExternalIds:string[],
+ courseExternalIds:string[],
+){
+ const hiddenAssignments=await tx.assignmentSource.updateMany({where:{childId:child,source:"GENESIS",available:true,externalId:{notIn:assignmentExternalIds}},data:{available:false}});
+ const hiddenCourses=await tx.course.updateMany({where:{childId:child,source:"GENESIS",schoolYear,active:true,externalId:{notIn:courseExternalIds}},data:{active:false}});
+ return hiddenAssignments.count+hiddenCourses.count;
+}
 export async function importGenesisBrowser(db:PrismaClient,input:unknown){
  const body=genesisImportSchema.parse(input),extractedAt=new Date(body.extractedAt);
  if(Math.abs(Date.now()-extractedAt.getTime())>7*86400000||extractedAt.getTime()>Date.now()+300000)throw new Error("INVALID_EXTRACTION_TIME");
@@ -43,6 +54,7 @@ export async function importGenesisBrowser(db:PrismaClient,input:unknown){
     if(old?.fingerprint!==fingerprint)await tx.sourceRevision.create({data:{assignmentSourceId:saved.id,raw,fingerprint,observedAt:extractedAt}});
     retrieved++;
    }
+   updated+=await reconcileGenesisSnapshot(tx,ch.child,body.schoolYear,ch.assignments.map(a=>`${body.schoolYear}/${a.courseId}/${a.externalId}`),ch.courses.map(c=>c.externalId));
    if(ch.lunchBalance!==undefined){const old=await tx.lunchBalanceSnapshot.findFirst({where:{childId:ch.child},orderBy:{observedAt:"desc"}});if(!old||Number(old.balance)!==ch.lunchBalance){await tx.lunchBalanceSnapshot.create({data:{childId:ch.child,balance:ch.lunchBalance,syncRunId:run.id,observedAt:extractedAt}});snapshots++;}retrieved++;}
   }
   await tx.syncRun.update({where:{id:run.id},data:{status:"SUCCESS",finishedAt:new Date(),recordsRetrieved:retrieved,recordsCreated:created,recordsUpdated:updated,snapshotChanges:snapshots}});

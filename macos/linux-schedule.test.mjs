@@ -16,9 +16,9 @@ const entry = cronEntry({
   display: ":0",
 });
 
-test("entry runs the collector at 8am and 8pm with the schedule marker", () => {
-  assert.equal(cronSchedule, "0 8,20 * * *");
-  assert.match(entry, /^0 8,20 \* \* \* /);
+test("entry runs the collector hourly with the schedule marker", () => {
+  assert.equal(cronSchedule, "0 * * * *");
+  assert.match(entry, /^0 \* \* \* \* /);
   assert.ok(entry.includes("collector/run.ts"));
   assert.ok(entry.includes("--import tsx"));
   assert.ok(entry.includes("/home/user/KidsDashboard"));
@@ -33,7 +33,7 @@ test("DISPLAY is exported so it reaches node, not just cd", () => {
   // `cd`, so headed Chrome failed to start under cron with no display.
   assert.match(
     entry,
-    /^0 8,20 \* \* \* export DISPLAY=':0'; cd .* && .*node.*collector\/run\.ts/,
+    /^0 \* \* \* \* export DISPLAY=':0'; cd .* && .*node.*collector\/run\.ts/,
   );
   assert.ok(!entry.match(/(^| )DISPLAY=[^ ;]* cd /));
 });

@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 // Registers the same hourly job — node --import tsx collector/run.ts at
 // minute 0 — as a per-user cron entry instead of a LaunchAgent plist.
 export const label='local.kidsdashboard.collector';
-export const cronSchedule='0 8,20 * * *';
+export const cronSchedule='0 * * * *';
 export const root=dirname(dirname(fileURLToPath(import.meta.url)));
 
 export function shellQuote(s){
@@ -56,7 +56,7 @@ function install(){
   mkdirSync(logs,{recursive:true,mode:0o700});
   const entry=cronEntry({rootDir:root,nodeExe:process.execPath,logs,display:process.env.DISPLAY||':0'});
   writeCrontab(upsertCronEntry(readCrontab(),entry,label));
-  console.log('Scheduled refresh enabled twice daily at 8:00am and 8:00pm.');
+  console.log('Scheduled hourly refresh enabled at the top of every hour.');
   console.log('Chrome opens during collection. Keep this computer awake, logged in, and connected.');
   console.log('Logs: '+logs);
   console.log('Verify with: crontab -l');
