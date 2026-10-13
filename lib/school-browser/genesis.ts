@@ -9,6 +9,13 @@ async function navigate(page:Page,url:string,id:string){
  const actual=new URL(page.url());if(actual.origin!==origin||actual.searchParams.get("studentid")!==id)throw new CollectorError("Genesis student navigation could not be verified. Nothing imported.");
  if(await page.locator('input[type="password"]:visible').count())throw new CollectorError("Genesis session expired. Nothing imported.");
 }
+// A changed or missing balance never blocks grades and assignments; undefined keeps the last stored value.
+export function parseGenesisLunchBalance(balances:string[]):number|undefined{
+ if(balances.length!==1)return undefined;
+ const raw=balances[0];
+ if(!/^\(?-?\$?[\d,]+\.\d{2}\)?$/.test(raw))return undefined;
+ return Number(raw.replace(/[$,()]/g,""))*(raw.includes("(")?-1:1);
+}
 export async function collectGenesis(page:Page,config:CollectorConfig,sink?: (body: unknown)=>Promise<unknown>){
  await signIn(page,"genesis",config.genesis,Object.values(config.genesis.studentIds));
  const extractedAt=new Date().toISOString();const now=new Date();const year=now.getMonth()>=7?now.getFullYear():now.getFullYear()-1;
@@ -26,8 +33,8 @@ export async function collectGenesis(page:Page,config:CollectorConfig,sink?: (bo
   await navigate(page,summary,id);
   // Read only the labeled balance row, never the surrounding personal-information table.
   const balances=await page.locator("tr").evaluateAll(rows=>rows.map(r=>r as HTMLTableRowElement).filter(r=>r.cells.length>=2&&/^Lunch Balance:?$/.test(r.cells[0].innerText.trim())).map(r=>r.cells[1].innerText.trim()));
-  if(balances.length!==1||!/^\(?-?\$?[\d,]+\.\d{2}\)?$/.test(balances[0]))throw new CollectorError(`Genesis ${child}: lunch balance structure changed. Nothing imported.`);
-  const lunchBalance=Number(balances[0].replace(/[$,()]/g,""))*(balances[0].includes("(")?-1:1);
+  const lunchBalance=parseGenesisLunchBalance(balances);
+  if(lunchBalance===undefined)console.log(`Genesis ${child}: lunch balance unreadable; grades and assignments continue without it.`);
   await navigate(page,assignmentsLink,id);
   for(const [name,value] of [["fldDateRange","allMP"],["fldCourse",""],["fldStatus",""]]){
    const select=page.locator(`select[name="${name}"]`);if(await select.count()!==1)throw new CollectorError("Genesis assignment filters changed.");
@@ -64,7 +71,7 @@ export async function collectGenesis(page:Page,config:CollectorConfig,sink?: (bo
    const status=/\bMissing\b/i.test(score)?"MISSING":/\bLate\b/i.test(score)?"LATE":fraction||pct?"GRADED":/No Grade/i.test(score)?"UPCOMING":"UNKNOWN";
    return {externalId:r.id,courseId:matches[0].externalId,title,category,dueDate,status,pointsEarned:fraction?Number(fraction[1]):null,pointsPossible:fraction?Number(fraction[2]):possible?Number(possible[1]):null,grade:pct?Number(pct[1]):null,currentGrade:fraction?`${fraction[1]} / ${fraction[2]}`:pct?score.split("\n")[0]:null};
   });
-  children.push({child,courses,assignments,lunchBalance});console.log(`Genesis ${child}: ${courses.length} courses, ${assignments.length} assignments, lunch balance read.`);
+  children.push({child,courses,assignments,lunchBalance});console.log(`Genesis ${child}: ${courses.length} courses, ${assignments.length} assignments${lunchBalance===undefined?", lunch balance skipped":", lunch balance read"}.`);
  }
  const payload=genesisImportSchema.parse({extractedAt,schoolYear:`${year}-${year+1}`,children});
  if(sink){await sink(payload);return;}
