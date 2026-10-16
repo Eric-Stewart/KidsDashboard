@@ -3,6 +3,7 @@ import { childName } from "@/lib/children";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { scheduleDashboardRefresh } from "@/lib/dashboard-refresh";
+import { lunchBalanceLabel } from "@/lib/lunch-balance-label";
 import Link from "next/link";
 import {
   AlertCircle,
@@ -151,11 +152,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
                 </div>
                 <div className="summary-foot">
                   <span>
-                    {data.demo
-                      ? "Sample data"
-                      : lunch?.observedAt
-                        ? `Lunch updated ${formatInTimeZone(lunch.observedAt, SCHOOL_TIMEZONE, "MMM d, h:mm a")}`
-                        : "Waiting for school data"}
+                    {lunchBalanceLabel(lunch?.observedAt || null, data.demo)}
                   </span>
                   <span>{childName(child)} · School overview</span>
                 </div>
